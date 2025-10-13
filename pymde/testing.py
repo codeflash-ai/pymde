@@ -8,6 +8,10 @@ import torch
 
 from pymde import util
 
+_devices = ["cpu", "cuda"] if torch.cuda.is_available() else ["cpu"]
+
+_parametrize_device = pytest.mark.parametrize("device", _devices)
+
 
 def assert_allclose(x, y, up_to_sign=False, rtol=1e-4, atol=1e-5):
     if isinstance(x, torch.Tensor):
@@ -43,10 +47,7 @@ def cpu(func):
 
 
 def cpu_and_cuda(func):
-    if torch.cuda.is_available():
-        return pytest.mark.parametrize("device", ["cpu", "cuda"])(func)
-    else:
-        return pytest.mark.parametrize("device", ["cpu"])(func)
+    return _parametrize_device(func)
 
 
 @contextmanager
