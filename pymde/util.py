@@ -42,8 +42,10 @@ def _module_device(module):
     if not data:
         return None
     device = str(data[0].device)
-    if any(str(datum.device) != device for datum in data):
-        return None
+    ref_device = data[0].device
+    for datum in data:
+        if datum.device != ref_device:
+            return None
     return device
 
 
