@@ -145,7 +145,7 @@ class Power(Function):
         self.exponent = util.to_tensor(exponent, device=self.deviations.device)
 
     def forward(self, distances):
-        return (self.deviations - distances).abs().pow(self.exponent)
+        return torch.sub(self.deviations, distances).abs_().pow(self.exponent)
 
 
 class _WeightedPower(Function):
