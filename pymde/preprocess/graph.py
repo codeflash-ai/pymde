@@ -109,6 +109,10 @@ class Graph(object):
         self._adjacency_matrix = adjacency_matrix
         self._edges = None
         self._distances = None
+        
+        # Cache indices and indptr for faster access
+        self._indices = adjacency_matrix.indices
+        self._indptr = adjacency_matrix.indptr
 
     @staticmethod
     def from_edges(edges, weights=None, n_items=None):
@@ -185,7 +189,7 @@ class Graph(object):
 
     def neighbors(self, node: int) -> np.ndarray:
         """The indices of the neighbors of ``node``."""
-        return self.A.indices[self.A.indptr[node] : self.A.indptr[node + 1]]
+        return self._indices[self._indptr[node] : self._indptr[node + 1]]
 
     def neighbor_distances(self, node) -> np.ndarray:
         """The distances associated with the edges connected to ``node``."""
@@ -254,6 +258,10 @@ class Graph(object):
         X = mde.embed(verbose=verbose)
         mde.plot(edges=self.edges)
         return X
+
+    @property
+    def A(self):
+        return self._adjacency_matrix
 
 
 def scale(graph, natural_length):
