@@ -364,8 +364,9 @@ class LogRatio(Function):
         self.exponent = exponent
 
     def forward(self, distances):
+        d_exp = distances.pow(self.exponent)
         return self.weights * torch.log(
-            distances**self.exponent / (1 + distances**self.exponent)
+            d_exp / (1 + d_exp)
         )
 
 
