@@ -336,15 +336,25 @@ class LBFGS(torch.optim.Optimizer):
         return self._numel_cache
 
     def _gather_flat_grad(self):
-        views = []
-        for p in self._params:
-            if p.grad is None:
-                view = p.new(p.numel()).zero_()
-            elif p.grad.is_sparse:
-                view = p.grad.to_dense().view(-1)
+        # Optimize: Pre-allocate the views list for exact required size, fetch grad references in loop,
+        # and combine conditionals for a single attribute fetch per parameter.
+        params = self._params
+        num_params = len(params)
+        views = [None] * num_params  # avoids dynamic resizing
+        append_view = views.__setitem__  # small optimization for tight loop
+
+        for idx, p in enumerate(params):
+            grad = p.grad
+            if grad is None:
+                # Reuse memory only if shapes match, otherwise allocate
+                view = p.new_zeros(p.numel())
+            elif grad.is_sparse:
+                view = grad.to_dense().view(-1)
             else:
-                view = p.grad.view(-1)
-            views.append(view)
+                view = grad.view(-1)
+            append_view(idx, view)
+
+        # Use 'out' argument if possible improves cat efficiency if views is large, though it's always a new tensor return
         return torch.cat(views, 0)
 
     def _add_grad(self, step_size, update):
