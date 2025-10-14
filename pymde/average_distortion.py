@@ -21,8 +21,9 @@ class _Norm(torch.autograd.Function):
         x, norm_x = ctx.saved_tensors
         grad_output = grad_output.unsqueeze(1)
         norm_x = norm_x.unsqueeze(1)
-        grad_input = x.mul(grad_output).div(norm_x)
-        grad_input[torch.isnan(grad_input)] = 0.0
+        grad_input = x.mul(grad_output)
+        grad_input.div_(norm_x)
+        grad_input = torch.nan_to_num(grad_input, nan=0.0)
         return grad_input
 
 
