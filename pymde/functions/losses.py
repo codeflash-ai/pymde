@@ -183,7 +183,7 @@ class Logistic(Function):
 
     def forward(self, distances):
         diff = self.deviations - distances
-        return torch.log(1.0 + torch.exp(diff.abs()))
+        return torch.log1p(torch.exp(diff.abs()))
 
 
 class Fractional(Function):
