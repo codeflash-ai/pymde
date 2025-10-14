@@ -49,26 +49,32 @@ def _validate_adjacency_matrix(matrix):
 
 
 def _to_graph(edges, distances=None, n_items=None):
-    "Distances for repeated edges are summed."
+    """Distances for repeated edges are summed."""
     if isinstance(edges, torch.Tensor):
         edges = edges.cpu().numpy()
 
+    # Avoid repeated dtype casting for distances
     if distances is None:
         distances = np.ones(edges.shape[0], dtype=np.float32)
     elif isinstance(distances, torch.Tensor):
-        distances = distances.cpu().float().numpy()
+        distances = distances.cpu().numpy().astype(np.float32, copy=False)
 
-    flip_idx = edges[:, 0] > edges[:, 1]
-    edges[flip_idx] = np.stack(
-        [edges[flip_idx][:, 1], edges[flip_idx][:, 0]], axis=1
-    )
+    # Fast in-place edge normalization to ensure edges[:, 0] <= edges[:, 1]
+    idx = edges[:, 0] > edges[:, 1]
+    if np.any(idx):
+        # Use a fast swap using advanced indexing and in-place assignment, eliminating np.stack and extra slicing
+        edges[idx, 0], edges[idx, 1] = edges[idx, 1], edges[idx, 0]
 
     if n_items is None:
         n_items = edges.max() + 1
+
     rows = edges[:, 0]
     cols = edges[:, 1]
-    graph = sp.coo_matrix((distances, (rows, cols)), shape=(n_items, n_items))
-    graph = graph + graph.T
+    # Construct both (i, j) and (j, i) edges in one step to avoid explicit graph + graph.T and extra sparse ops
+    data = np.concatenate([distances, distances])
+    all_rows = np.concatenate([rows, cols])
+    all_cols = np.concatenate([cols, rows])
+    graph = sp.coo_matrix((data, (all_rows, all_cols)), shape=(n_items, n_items))
     return Graph(graph.tocsr())
 
 
