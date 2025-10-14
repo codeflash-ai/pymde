@@ -388,13 +388,15 @@ class PushAndPull(Function):
         if weights.nelement() == 1:
             raise ValueError("`PushAndPull` requires at least two weights.")
         self.pos_idx = weights >= 0
+        self.pos_idx_indices = torch.where(self.pos_idx)[0]
+        self.neg_idx_indices = torch.where(~self.pos_idx)[0]
         self.attractive_penalty = attractive_penalty(weights[self.pos_idx])
         self.repulsive_penalty = repulsive_penalty(weights[~self.pos_idx])
 
     def forward(self, distances):
-        output = torch.empty(
-            distances.shape, dtype=distances.dtype, device=distances.device
-        )
-        output[self.pos_idx] = self.attractive_penalty(distances[self.pos_idx])
-        output[~self.pos_idx] = self.repulsive_penalty(distances[~self.pos_idx])
+        output = torch.empty_like(distances)
+        if self.pos_idx_indices.numel() > 0:
+            output.index_copy_(0, self.pos_idx_indices, self.attractive_penalty(distances.index_select(0, self.pos_idx_indices)))
+        if self.neg_idx_indices.numel() > 0:
+            output.index_copy_(0, self.neg_idx_indices, self.repulsive_penalty(distances.index_select(0, self.neg_idx_indices)))
         return output
