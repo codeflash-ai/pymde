@@ -296,15 +296,25 @@ class Hinge(Function):
         self.threshold = threshold
         self.sigma = sigma
 
+        # Precompute shifted threshold for efficiency, store as a buffer if possible
+        # This is only valid if self.weights is not expected to change after init
+        if isinstance(self.weights, torch.Tensor):
+            self._shifted_threshold = self.threshold - torch.sign(self.weights) * self.sigma
+        else:
+            self._shifted_threshold = None  # fallback if unexpected type
+
     def forward(self, distances):
-        return torch.max(
-            torch.tensor(0.0, device=distances.device, dtype=distances.dtype),
-            self.weights
-            * (
-                distances
-                - (self.threshold - torch.sign(self.weights) * (self.sigma))
-            ),
-        )
+        # Avoid allocating a new tensor for the constant 0.0 on every call.
+        # Instead, use torch.clamp_min for efficiency (clamp x so that x >= 0).
+        if self._shifted_threshold is not None:
+            shifted = distances - self._shifted_threshold
+            result = self.weights * shifted
+        else:
+            # fallback, should never occur unless weights isn't torch.Tensor
+            shifted = distances - (self.threshold - torch.sign(self.weights) * (self.sigma))
+            result = self.weights * shifted
+        # torch.clamp_min is faster than torch.max with constant, avoids tensor construction
+        return torch.clamp_min(result, 0.0)
 
 
 class Log1p(Function):
