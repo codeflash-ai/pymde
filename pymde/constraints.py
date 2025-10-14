@@ -210,7 +210,10 @@ class _Sphere(Constraint):
 
     def initialization(self, n_items, embedding_dim, device=None):
         X = torch.randn((n_items, embedding_dim), device=device)
-        return self.radius * (X / X.norm(dim=1)[:, None])
+        X_norm = torch.linalg.norm(X, dim=1, keepdim=True)
+        X.div_(X_norm)
+        X.mul_(self.radius)
+        return X
 
     def project_onto_tangent_space(self, X, Z, inplace=True):
         # get the diagonal of Z @ X.T efficiently
