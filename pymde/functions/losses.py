@@ -171,7 +171,13 @@ class Absolute(Function):
         self.deviations = util.to_tensor(deviations)
 
     def forward(self, distances):
-        return (self.deviations - distances).abs()
+        if (isinstance(distances, type(self.deviations)) 
+            and distances.shape == self.deviations.shape):
+            diff = self.deviations.clone()
+            diff.sub_(distances)
+            return diff.abs_()
+        else:
+            return (self.deviations - distances).abs()
 
 
 class Logistic(Function):
