@@ -138,13 +138,11 @@ class _DeadzoneQuadratic(Function):
         self.threshold = threshold
 
     def forward(self, distances):
-        output = torch.zeros(
-            distances.shape, dtype=distances.dtype, device=distances.device
+        output = torch.where(
+            distances < self.threshold,
+            0.0,
+            distances.pow(2)
         )
-        lt_thresh = distances < self.threshold
-        gt_thresh = ~lt_thresh
-        output[lt_thresh] = 0.0
-        output[gt_thresh] = distances[gt_thresh].pow(2)
         return self.weights * output
 
 
