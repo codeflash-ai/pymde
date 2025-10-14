@@ -350,7 +350,8 @@ class InvPower(Function):
         self.exponent = exponent
 
     def forward(self, distances):
-        return self.weights.abs() * 1 / (distances**self.exponent)
+        denom = torch.pow(distances, self.exponent)
+        return self.weights.abs() / denom
 
 
 class LogRatio(Function):
