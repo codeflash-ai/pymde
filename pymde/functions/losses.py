@@ -215,18 +215,20 @@ class SoftFractional(Function):
         if gamma <= 0.0:
             raise ValueError("gamma must be positive, received ", float(gamma))
 
+        # Cache constants for efficiency
+        self._log2 = torch.log(torch.tensor(2.0, dtype=self.deviations.dtype, device=self.deviations.device))
+
     def forward(self, distances):
-        stacked = torch.stack(
-            (self.deviations / distances, distances / self.deviations)
-        ).T
-        return (
-            1.0
-            / self.gamma
-            * (
-                torch.logsumexp(self.gamma * stacked, dim=1)
-                - (torch.log(torch.tensor(2.0)) + self.gamma)
-            )
+        # Avoid creating intermediate stacked tensors
+        div1 = self.deviations / distances
+        div2 = distances / self.deviations
+        # [N, 2], compute two columns, then use logsumexp along dim=1
+        stacked2 = torch.stack((div1, div2), dim=1)
+        out = (
+            torch.logsumexp(self.gamma * stacked2, dim=1)
+            - (self._log2 + self.gamma)
         )
+        return out / self.gamma
 
 
 class _Log1p(Function):
