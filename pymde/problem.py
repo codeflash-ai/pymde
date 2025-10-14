@@ -13,8 +13,8 @@ import typing as tp
 
 import torch
 
-from pymde.average_distortion import _average_distortion
-from pymde.average_distortion import _gather_indices, _norm
+from pymde.average_distortion import _gather_indices, _average_distortion
+from pymde.average_distortion import _norm
 from pymde import constraints
 from pymde.functions.function import StochasticFunction
 from pymde.util import _canonical_device, _module_device
@@ -304,7 +304,16 @@ class MDE(torch.nn.Module):
                 "Call this function after running the `embed` method, or "
                 "provide a value for the embedding argument `X`"
             )
-        return self.distortion_function(self.distances(X))
+        # Avoid redundant function call overhead for self.distances(X) by reusing the logic
+        # that is already optimized above. This also avoids extra differences/_norm dispatch.
+        lhs = X.gather(0, self._lhs)
+        rhs = X.gather(0, self._rhs)
+        diffs = lhs - rhs
+        try:
+            dists = torch.norm(diffs, dim=1)
+        except Exception:
+            dists = _norm(diffs)
+        return self.distortion_function(dists)
 
     def average_distortion(self, X=None):
         """Compute average distortion.
