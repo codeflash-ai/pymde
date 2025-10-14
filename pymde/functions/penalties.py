@@ -168,7 +168,7 @@ class Cubic(Function):
         self.weights = util.to_tensor(weights)
 
     def forward(self, distances):
-        return self.weights * distances.pow(3)
+        return self.weights * distances.mul(distances).mul(distances)
 
 
 class _DeadzoneCubic(Function):
