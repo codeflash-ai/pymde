@@ -49,7 +49,7 @@ def _validate_adjacency_matrix(matrix):
 
 
 def _to_graph(edges, distances=None, n_items=None):
-    "Distances for repeated edges are summed."
+    """Distances for repeated edges are summed."""
     if isinstance(edges, torch.Tensor):
         edges = edges.cpu().numpy()
 
@@ -58,18 +58,25 @@ def _to_graph(edges, distances=None, n_items=None):
     elif isinstance(distances, torch.Tensor):
         distances = distances.cpu().float().numpy()
 
+    # In-place normalization of edge direction
+    # Only flip those rows where edges[:,0] > edges[:,1]
     flip_idx = edges[:, 0] > edges[:, 1]
-    edges[flip_idx] = np.stack(
-        [edges[flip_idx][:, 1], edges[flip_idx][:, 0]], axis=1
-    )
+    if np.any(flip_idx):
+        edges[flip_idx] = edges[flip_idx][:, ::-1]  # Swap columns directly
 
     if n_items is None:
         n_items = edges.max() + 1
+
     rows = edges[:, 0]
     cols = edges[:, 1]
-    graph = sp.coo_matrix((distances, (rows, cols)), shape=(n_items, n_items))
-    graph = graph + graph.T
-    return Graph(graph.tocsr())
+
+    # Construct COO matrix, sum duplicates more efficiently using CSR
+    graph = sp.coo_matrix((distances, (rows, cols)), shape=(n_items, n_items)).tocsr()
+
+    # Avoid constructing dense graph + graph.T; use efficient CSR symmetric sum
+    graph = graph + graph.transpose()
+
+    return Graph(graph)
 
 
 class Graph(object):
