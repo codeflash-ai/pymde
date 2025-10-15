@@ -133,7 +133,10 @@ class Cubic(Function):
         self.deviations = util.to_tensor(deviations)
 
     def forward(self, distances):
-        return (self.deviations - distances).abs().pow(3)
+        diff = (self.deviations - distances)
+        diff.abs_()
+        diff.pow_(3)
+        return diff
 
 
 class Power(Function):
