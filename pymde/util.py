@@ -41,10 +41,11 @@ def _module_device(module):
     data = list(module.buffers())
     if not data:
         return None
-    device = str(data[0].device)
-    if any(str(datum.device) != device for datum in data):
-        return None
-    return device
+    device = data[0].device
+    for datum in data:
+        if datum.device != device:
+            return None
+    return str(device)
 
 
 def _is_numeric(arg):
