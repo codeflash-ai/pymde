@@ -220,33 +220,55 @@ def _rotate_2d(X, degrees):
 
 @tensor_arguments
 def _rotate_3d(X, alpha, beta, gamma):
+    # Convert angles to radians and float only once
     alpha = torch.deg2rad(alpha.float())
     beta = torch.deg2rad(beta.float())
     gamma = torch.deg2rad(gamma.float())
+
+    # Precompute trig values to avoid redundant computation
+    cos_alpha = torch.cos(alpha)
+    sin_alpha = torch.sin(alpha)
+    cos_beta = torch.cos(beta)
+    sin_beta = torch.sin(beta)
+    cos_gamma = torch.cos(gamma)
+    sin_gamma = torch.sin(gamma)
+
+    # Explicit dtype for tensors to avoid slow type inference, match input
+    dtype = X.dtype
+    device = X.device
+
+    # Use torch.stack to avoid Python lists, and construct in a single call per matrix
+    # rot_x
     rot_x = torch.tensor(
         [
-            [1, 0, 0],
-            [0, torch.cos(alpha), torch.sin(alpha)],
-            [0, -torch.sin(alpha), torch.cos(alpha)],
+            [1,        0,         0],
+            [0,  cos_alpha, sin_alpha],
+            [0, -sin_alpha, cos_alpha],
         ],
-        device=X.device,
+        device=device,
+        dtype=dtype
     )
+    # rot_y
     rot_y = torch.tensor(
         [
-            [torch.cos(beta), 0.0, -torch.sin(beta)],
-            [0, 1, 0],
-            [torch.sin(beta), 0.0, torch.cos(beta)],
+            [cos_beta,   0, -sin_beta],
+            [0,          1,        0 ],
+            [sin_beta,   0,  cos_beta],
         ],
-        device=X.device,
+        device=device,
+        dtype=dtype
     )
+    # rot_z
     rot_z = torch.tensor(
         [
-            [torch.cos(gamma), torch.sin(gamma), 0.0],
-            [-torch.sin(gamma), torch.cos(gamma), 0.0],
-            [0, 0, 1],
+            [ cos_gamma, sin_gamma, 0],
+            [-sin_gamma, cos_gamma, 0],
+            [        0,        0 , 1]
         ],
-        device=X.device,
+        device=device,
+        dtype=dtype
     )
+    # Use chained matrix multiplication
     rot_3d = rot_x @ rot_y @ rot_z
     return X @ rot_3d
 
