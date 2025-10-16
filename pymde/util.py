@@ -417,9 +417,12 @@ def random_edges(n, p, seed=0):
         n
         - 2
         - np.floor(np.sqrt(-8 * edge_idx + 4 * n * (n - 1) - 7) / 2.0 - 0.5)
-    )
-    v = edge_idx + u + 1 - n * (n - 1) / 2 + (n - u) * ((n - u) - 1) / 2
-    return torch.tensor(np.stack([u, v], axis=1).astype(np.int64))
+    ).astype(np.int64)
+    v = (edge_idx + u + 1 - n * (n - 1) / 2 + (n - u) * ((n - u) - 1) / 2).astype(np.int64)
+    edges = np.empty((p, 2), dtype=np.int64)
+    edges[:, 0] = u
+    edges[:, 1] = v
+    return torch.from_numpy(edges)
 
 
 class Distortion(torch.autograd.Function):
