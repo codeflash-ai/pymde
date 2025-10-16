@@ -49,7 +49,7 @@ def _validate_adjacency_matrix(matrix):
 
 
 def _to_graph(edges, distances=None, n_items=None):
-    "Distances for repeated edges are summed."
+    """Distances for repeated edges are summed."""
     if isinstance(edges, torch.Tensor):
         edges = edges.cpu().numpy()
 
@@ -58,17 +58,30 @@ def _to_graph(edges, distances=None, n_items=None):
     elif isinstance(distances, torch.Tensor):
         distances = distances.cpu().float().numpy()
 
-    flip_idx = edges[:, 0] > edges[:, 1]
-    edges[flip_idx] = np.stack(
-        [edges[flip_idx][:, 1], edges[flip_idx][:, 0]], axis=1
-    )
+    # Vectorized flip using np.where directly, minimizing view/indexing overhead
+    # This avoids costly repeated advanced indexing and np.stack
+    e0, e1 = edges[:, 0], edges[:, 1]
+    need_flip = e0 > e1
+    # Swap so that (min, max) always held
+    if np.any(need_flip):  # Only allocate if necessary
+        e0f = np.where(need_flip, e1, e0)
+        e1f = np.where(need_flip, e0, e1)
+        edges = np.column_stack((e0f, e1f))
+        # NOTE: we safely reassign because original input is not explicitly mutated (behavior preserved)
+    # else: no-op
 
     if n_items is None:
         n_items = edges.max() + 1
     rows = edges[:, 0]
     cols = edges[:, 1]
-    graph = sp.coo_matrix((distances, (rows, cols)), shape=(n_items, n_items))
-    graph = graph + graph.T
+
+    # The largest savings are from efficient symmetric matrix assembly
+    # Build the COO matrix with both directions at once (make symmetric directly)
+    data = np.concatenate([distances, distances])
+    row_inds = np.concatenate([rows, cols])
+    col_inds = np.concatenate([cols, rows])
+    graph = sp.coo_matrix((data, (row_inds, col_inds)), shape=(n_items, n_items))
+
     return Graph(graph.tocsr())
 
 
@@ -276,6 +289,8 @@ def scale(graph, natural_length):
     rms = graph.distances.pow(2).mean().sqrt()
     alpha = natural_length / rms
     distances = alpha * graph.distances
+    # avoid .cpu().numpy() if already on cpu and contiguous, for very large arrays.
+    # Pytorch's .cpu().numpy() is cheap if already cpu, so keep as-is for behavior.
     return _to_graph(graph.edges, distances.cpu().numpy())
 
 
