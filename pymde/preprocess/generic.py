@@ -7,7 +7,10 @@ from pymde.preprocess import graph
 
 
 def _is_data_matrix(data):
-    return sp.issparse(data) or isinstance(data, (np.ndarray, torch.Tensor))
+    # Put the faster isinstance check first to avoid expensive issparse calls on common cases
+    if isinstance(data, (np.ndarray, torch.Tensor)):
+        return True
+    return sp.issparse(data)
 
 
 def distances(data, retain_fraction=1.0, verbose=False):
