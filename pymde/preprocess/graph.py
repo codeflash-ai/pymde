@@ -87,26 +87,35 @@ class Graph(object):
     """
 
     def __init__(self, adjacency_matrix):
-        if isinstance(adjacency_matrix, np.ndarray):
-            adjacency_matrix = sp.csr_matrix(adjacency_matrix)
+        # Fast path for already-correct input types
+        if isinstance(adjacency_matrix, sp.csr_matrix):
+            adj = adjacency_matrix
+        elif isinstance(adjacency_matrix, np.ndarray):
+            # sp.csr_matrix(np.ndarray) is fast; skip .copy() to save mem/CPU
+            adj = sp.csr_matrix(adjacency_matrix)
         elif isinstance(adjacency_matrix, torch.Tensor):
-            adjacency_matrix = sp.csr_matrix(adjacency_matrix.cpu().numpy())
-        elif sp.issparse(adjacency_matrix) and not isinstance(
-            adjacency_matrix, sp.csr_matrix
-        ):
+            # Avoids .copy(); uses asarray, which does not copy if already ndarray
+            adj = sp.csr_matrix(np.asarray(adjacency_matrix.cpu()))
+        elif sp.issparse(adjacency_matrix):
             LOGGER.warning(
                 "The adjacency matrix for a Graph object should be "
                 "a CSR matrix; converting your matrix to a CSR "
                 "matrix, which may be costly ..."
             )
-            adjacency_matrix = adjacency_matrix.tocsr()
+            adj = adjacency_matrix.tocsr()
+        else:
+            raise TypeError("Expected a NumPy array, torch.Tensor, or scipy sparse matrix.")
 
-        unreachable = adjacency_matrix.data == np.inf
-        adjacency_matrix.data[unreachable] = 0
-        adjacency_matrix.eliminate_zeros()
-        _validate_adjacency_matrix(adjacency_matrix)
+        data = adj.data
+        # Use a mask to efficiently zero inf entries, then eliminate zeros.
+        inf_mask = np.isinf(data)
+        if inf_mask.any():
+            data[inf_mask] = 0
+            adj.eliminate_zeros()
+        # Always validate the adjacency matrix (fast diagonal read for CSR)
+        _validate_adjacency_matrix(adj)
 
-        self._adjacency_matrix = adjacency_matrix
+        self._adjacency_matrix = adj
         self._edges = None
         self._distances = None
 
@@ -185,7 +194,8 @@ class Graph(object):
 
     def neighbors(self, node: int) -> np.ndarray:
         """The indices of the neighbors of ``node``."""
-        return self.A.indices[self.A.indptr[node] : self.A.indptr[node + 1]]
+        A = self._adjacency_matrix
+        return A.indices[A.indptr[node] : A.indptr[node + 1]]
 
     def neighbor_distances(self, node) -> np.ndarray:
         """The distances associated with the edges connected to ``node``."""
