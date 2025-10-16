@@ -295,7 +295,8 @@ def center(X):
     Returns a new embedding, equal to the given embedding minus the mean
     of its rows.
     """
-    return X - X.mean(dim=0)[None, :]
+    mean = X.mean(dim=0, keepdim=True)
+    return X - mean
 
 
 @tensor_arguments
